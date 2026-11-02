@@ -15,39 +15,77 @@
 
 #include "basalt_ros/image_subscriber.hpp"
 
+#include <cstdlib>
 #include <functional>
 #include <stdexcept>
 
-using namespace std::placeholders;
-
 namespace basalt_ros
 {
-ImageSubscriber::ImageSubscriber(
-  rclcpp::Node * node, const std::string & topic_left,
-  const std::string & topic_right)
-: node_(node)
+// frames kept waiting for their missing images
+static constexpr size_t MAX_PENDING_FRAMES = 100;
+
+static int64_t to_ns(const builtin_interfaces::msg::Time & t)
 {
-  subs_.push_back(
-    std::make_shared<message_filters::Subscriber<Image>>(node_, topic_left));
-  subs_.push_back(
-    std::make_shared<message_filters::Subscriber<Image>>(node, topic_right));
-  sync_ = std::make_shared<message_filters::TimeSynchronizer<Image, Image>>(
-    *subs_[0], *subs_[1], 100);
-  sync_->registerCallback(std::bind(&ImageSubscriber::callback, this, _1, _2));
+  return t.sec * 1000000000LL + t.nanosec;
+}
+
+ImageSubscriber::ImageSubscriber(
+  rclcpp::Node * node, const std::vector<std::string> & topics,
+  int64_t sync_tolerance_ns)
+: node_(node), syncToleranceNs_(sync_tolerance_ns)
+{
+  for (size_t cam = 0; cam < topics.size(); cam++) {
+    subs_.push_back(node_->create_subscription<Image>(
+      topics[cam], 10, [this, cam](const ImageConstPtr msg) {
+        imageCallback(cam, msg);
+      }));
+  }
   lastTime_ = node_->now();
 }
 
-void ImageSubscriber::callback(
-  const ImageConstPtr & left, const ImageConstPtr & right)
+void ImageSubscriber::imageCallback(size_t cam, const ImageConstPtr & img)
+{
+  std::vector<ImageConstPtr> frame;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const int64_t t = to_ns(img->header.stamp);
+    auto it = pending_.end();
+    for (auto p = pending_.begin(); p != pending_.end(); ++p) {
+      if (std::llabs(p->first - t) <= syncToleranceNs_ && !p->second[cam]) {
+        it = p;
+        break;
+      }
+    }
+    if (it == pending_.end()) {
+      it = pending_.emplace(t, std::vector<ImageConstPtr>(subs_.size())).first;
+      if (it->second[cam]) {
+        return;  // same stamp twice from this camera
+      }
+    }
+    it->second[cam] = img;
+    for (const auto & m : it->second) {
+      if (!m) {
+        if (pending_.size() > MAX_PENDING_FRAMES) {
+          pending_.erase(pending_.begin());
+        }
+        return;
+      }
+    }
+    frame = it->second;
+    // older frames can no longer complete
+    pending_.erase(pending_.begin(), std::next(it));
+  }
+  callback(frame);
+}
+
+void ImageSubscriber::callback(const std::vector<ImageConstPtr> & msg)
 {
   basalt::OpticalFlowInput::Ptr data(new basalt::OpticalFlowInput);
 
-  const int NUM_CAMS = 2;
+  const size_t NUM_CAMS = msg.size();
   data->img_data.resize(NUM_CAMS);
-  data->t_ns =
-    left->header.stamp.sec * 1000000000LL + left->header.stamp.nanosec;
-  const ImageConstPtr msg[2] = {left, right};
-  for (int i = 0; i < NUM_CAMS; i++) {
+  data->t_ns = to_ns(msg[0]->header.stamp);
+  for (size_t i = 0; i < NUM_CAMS; i++) {
     const auto & img = *msg[i];
     data->img_data[i].exposure =
       0;  /// XXX  RS2_FRAME_METADATA_ACTUAL_EXPOSURE * 1e-6
@@ -55,15 +93,14 @@ void ImageSubscriber::callback(
     data->img_data[i].img.reset(
       new basalt::ManagedImage<uint16_t>(img.width, img.height));
 
-    const uint8_t * data_in = (const uint8_t *)&img.data[0];
     uint16_t * data_out = data->img_data[i].img->ptr;
     // TODO(Bernd): this 8-bit to 16bit conversion can probably be done
     // more efficiently with opencv
-    size_t full_size = img.width * img.height;
-    for (size_t j = 0; j < full_size; j++) {
-      int val = data_in[j];
-      val = val << 8;
-      data_out[j] = val;
+    for (size_t y = 0; y < img.height; y++) {
+      const uint8_t * data_in = &img.data[y * img.step];
+      for (size_t x = 0; x < img.width; x++) {
+        data_out[y * img.width + x] = data_in[x] << 8;
+      }
     }
   }
 

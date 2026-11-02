@@ -20,7 +20,9 @@
 #include <array>
 #include <memory>
 #include <nav_msgs/msg/odometry.hpp>
+#include <nav_msgs/msg/path.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <vector>
 
 #include "basalt_ros/basalt_types.hpp"
 
@@ -40,9 +42,11 @@ private:
   rclcpp::Node * node_;
   std::shared_ptr<tf2_ros::TransformBroadcaster> tfBroadCaster_;
   std::shared_ptr<rclcpp::Publisher<nav_msgs::msg::Odometry>> pub_;
+  std::shared_ptr<rclcpp::Publisher<nav_msgs::msg::Path>> pathPub_;
   std::array<double, 36> poseCov_;
   std::array<double, 36> twistCov_;
   nav_msgs::msg::Odometry msg_;
+  std::vector<geometry_msgs::msg::PoseStamped> path_;  // full pose history
   bool extraTF_{false};
   bool publishTF_{false};
   Eigen::Vector3d T_extra_;     // extra translation:T_world_basaltworld

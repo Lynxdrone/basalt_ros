@@ -15,6 +15,7 @@
 
 #include "basalt_ros/vio_publisher.hpp"
 
+#include <cmath>
 #include <fstream>
 #include <ios>
 #include <stdexcept>
@@ -85,6 +86,7 @@ VIOPublisher::VIOPublisher(rclcpp::Node * node) : node_(node)
   RCLCPP_INFO(node_->get_logger(), "starting publisher");
 
   pub_ = node_->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
+  pathPub_ = node_->create_publisher<nav_msgs::msg::Path>("path", 2);
   // we don't do covariance quite yet....
   // Diagonal covariances, overridable via parameters. Defaults are
   // deliberately conservative so a downstream EKF does not trust the
@@ -170,6 +172,23 @@ void VIOPublisher::publish(const BasaltPoseVelBiasState::Ptr & data)
   msg_.twist.covariance = twistCov_;
 
   pub_->publish(msg_);
+
+  // Append to the pose history and publish the trajectory (as in MINS).
+  // The poses are downsampled to at most 16384 to prevent rviz crashes:
+  // https://github.com/ros-visualization/rviz/issues/1107
+  geometry_msgs::msg::PoseStamped pose;
+  pose.header = msg_.header;
+  pose.pose = msg_.pose.pose;
+  path_.push_back(pose);
+
+  nav_msgs::msg::Path path;
+  path.header = msg_.header;
+  const size_t step =
+    static_cast<size_t>(std::floor(path_.size() / 16384.0)) + 1;
+  for (size_t i = 0; i < path_.size(); i += step) {
+    path.poses.push_back(path_[i]);
+  }
+  pathPub_->publish(path);
 
   if (publishTF_) {
     // make transform message

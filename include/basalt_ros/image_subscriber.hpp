@@ -17,14 +17,15 @@
 #define BASALT_ROS__IMAGE_SUBSCRIBER_HPP_
 
 #include <basalt/optical_flow/optical_flow.h>
-#include <message_filters/subscriber.h>
-#include <message_filters/time_synchronizer.h>
 #include <tbb/concurrent_queue.h>
 
+#include <map>
 #include <memory>
+#include <mutex>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <string>
+#include <vector>
 
 namespace basalt_ros
 {
@@ -38,9 +39,11 @@ class ImageSubscriber
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  // one topic per camera, in calibration order. Images are grouped into a
+  // frame when their stamps are within sync_tolerance of the first camera's
   ImageSubscriber(
-    rclcpp::Node * node, const std::string & topic_left,
-    const std::string & topic_right);
+    rclcpp::Node * node, const std::vector<std::string> & topics,
+    int64_t sync_tolerance_ns);
 
   ~ImageSubscriber() {}
 
@@ -48,11 +51,15 @@ public:
   void setQueue(OpticalFlowInputQueue * q) { queue_ = q; }
 
 private:
-  void callback(const ImageConstPtr & left, const ImageConstPtr & right);
+  void imageCallback(size_t cam, const ImageConstPtr & img);
+  void callback(const std::vector<ImageConstPtr> & msg);
   // ----- variables --
   rclcpp::Node * node_;
-  std::shared_ptr<message_filters::TimeSynchronizer<Image, Image>> sync_;
-  std::vector<std::shared_ptr<message_filters::Subscriber<Image>>> subs_;
+  std::vector<rclcpp::Subscription<Image>::SharedPtr> subs_;
+  int64_t syncToleranceNs_{0};
+  std::mutex mutex_;
+  // incomplete frames by stamp of the first image received
+  std::map<int64_t, std::vector<ImageConstPtr>> pending_;
   OpticalFlowInputQueue * queue_{nullptr};
   int64_t max_q_{0};
   uint64_t framesReceived_{0};

@@ -32,8 +32,20 @@ VIOFrontEnd::VIOFrontEnd(rclcpp::Node * node) : node_(node)
   basalt_ros::load_calib_and_config(node_, &calib, &config);
   // images and optical flow stay on the camera clock; the camera time
   // offset is applied in the backend (OpticalFlowSubscriber)
-  imageSub_ =
-    std::make_shared<ImageSubscriber>(node_, "left_image", "right_image");
+  // two cameras: left_image and right_image, more: image_0, image_1, ...
+  // (stereo pairs (0,1), (2,3), ...)
+  std::vector<std::string> topics;
+  if (calib.intrinsics.size() == 2) {
+    topics = {"left_image", "right_image"};
+  } else {
+    for (size_t i = 0; i < calib.intrinsics.size(); i++) {
+      topics.push_back("image_" + std::to_string(i));
+    }
+  }
+  const double sync_tolerance =
+    node_->declare_parameter<double>("sync_tolerance", 0.0);
+  imageSub_ = std::make_shared<ImageSubscriber>(
+    node_, topics, static_cast<int64_t>(sync_tolerance * 1e9));
   opticalFlow_ = basalt::OpticalFlowFactory::getOpticalFlow(config, calib);
   // connect image sub output queue to optical flow input queue
   imageSub_->setQueue(&(opticalFlow_->input_queue));
