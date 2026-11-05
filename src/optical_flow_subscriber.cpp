@@ -39,6 +39,14 @@ void OpticalFlowSubscriber::callback(const OpticalFlowMsgConstPtr msg)
   // shift from camera clock to IMU clock: t_imu = t_cam + offset
   data->t_ns = msg->header.stamp.sec * 1000000000LL +
     msg->header.stamp.nanosec + camTimeOffsetNs_;
+  if (data->t_ns <= lastNs_) {
+    // the estimator asserts on a zero (or negative) time delta between frames
+    RCLCPP_WARN_STREAM_THROTTLE(
+      node_->get_logger(), *node_->get_clock(), 5000,
+      "dropping optical flow " << data->t_ns << ", not newer than " << lastNs_);
+    return;
+  }
+  lastNs_ = data->t_ns;
   data->observations.resize(msg->observations.size());
   for (size_t obs_idx = 0; obs_idx < msg->observations.size(); obs_idx++) {
     const auto & msg_obs = msg->observations[obs_idx];

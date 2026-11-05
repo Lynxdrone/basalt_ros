@@ -15,13 +15,16 @@
 
 #ifndef BASALT_ROS__VIO_PUBLISHER_HPP_
 #define BASALT_ROS__VIO_PUBLISHER_HPP_
+#include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_broadcaster.h>
+#include <tf2_ros/transform_listener.h>
 
 #include <array>
 #include <memory>
 #include <nav_msgs/msg/odometry.hpp>
 #include <nav_msgs/msg/path.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <string>
 #include <vector>
 
 #include "basalt_ros/basalt_types.hpp"
@@ -35,9 +38,12 @@ public:
   explicit VIOPublisher(rclcpp::Node * node);
 
   void publish(const BasaltPoseVelBiasState::Ptr & data);
-  void setChildFrameId(const std::string & f) { msg_.child_frame_id = f; }
+  // frame of the IMU (= basalt body frame), taken from the IMU messages
+  void setChildFrameId(const std::string & f);
 
 private:
+  // fetch the static T_imu_base from TF, returns false if not available yet
+  bool updateImuToBase();
   // ----- variables --
   rclcpp::Node * node_;
   std::shared_ptr<tf2_ros::TransformBroadcaster> tfBroadCaster_;
@@ -51,6 +57,15 @@ private:
   bool publishTF_{false};
   Eigen::Vector3d T_extra_;     // extra translation:T_world_basaltworld
   Eigen::Quaterniond q_extra_;  // extra quaternion: q_world_basaltworld
+  // optional output body frame (e.g. base_link). When set, odometry and TF
+  // are published for this frame instead of the IMU frame.
+  std::string baseFrame_;
+  std::string imuFrame_;
+  std::shared_ptr<tf2_ros::Buffer> tfBuffer_;
+  std::shared_ptr<tf2_ros::TransformListener> tfListener_;
+  bool haveImuToBase_{false};
+  Eigen::Vector3d t_i_b_{Eigen::Vector3d::Zero()};  // base origin in imu frame
+  Eigen::Quaterniond q_i_b_{Eigen::Quaterniond::Identity()};
 };
 }  // namespace basalt_ros
 #endif  // BASALT_ROS__VIO_PUBLISHER_HPP_

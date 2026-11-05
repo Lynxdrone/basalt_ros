@@ -60,6 +60,7 @@ private:
   std::mutex mutex_;
   // incomplete frames by stamp of the first image received
   std::map<int64_t, std::vector<ImageConstPtr>> pending_;
+  int64_t lastFrameNs_{-1};  // stamp of the last frame sent to the queue
   OpticalFlowInputQueue * queue_{nullptr};
   int64_t max_q_{0};
   uint64_t framesReceived_{0};

@@ -45,8 +45,9 @@ def launch_setup(context, *args, **kwargs):
     backend_parameters = {**common_parameters,
                           **{'has_split_accel_and_gyro_topics': False,
                              'world_frame_id': LaunchConfig('world_frame'),
-                             'child_frame_id': 'zed_front_camera_center',
-                             'publish_tf': False}}
+                             'child_frame_id': 'pulse80_imu_link',
+                             'base_frame_id': LaunchConfig('base_frame'),
+                             'publish_tf': LaunchConfig('publish_tf')}}
 
     frontend_remappings = [
         ('left_image', LaunchConfig('left_image')),
@@ -102,8 +103,13 @@ def generate_launch_description():
                   default_value=['optical_flow'],
                   description='optical flow topic'),
         LaunchArg('imu_topic',
-                  default_value=['/zed_front/imu'],
+                  default_value=['/pulse80/imu'],
                   description='combined accel/gyro topic (Isaac Sim, zed_front_camera_center)'),
+        LaunchArg('base_frame', default_value=['base_link'],
+                  description='frame published as child of world_frame '
+                  '(empty: the IMU frame)'),
+        LaunchArg('publish_tf', default_value=['true'],
+                  description='broadcast world_frame -> base_frame on TF'),
         LaunchArg('world_frame',
                   default_value=['basalt_odom'],
                   description='frame of the published VIO odometry'),

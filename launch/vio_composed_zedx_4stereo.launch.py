@@ -26,7 +26,7 @@ from launch.substitutions import PathJoinSubstitution
 from launch.actions import DeclareLaunchArgument as LaunchArg
 from launch.actions import OpaqueFunction
 from launch_ros.substitutions import FindPackageShare
-from launch_ros.actions import ComposableNodeContainer
+from launch_ros.actions import ComposableNodeContainer, Node
 from launch_ros.descriptions import ComposableNode
 
 
@@ -52,8 +52,9 @@ def launch_setup(context, *args, **kwargs):
     backend_parameters = {**common_parameters,
                           **{'has_split_accel_and_gyro_topics': False,
                              'world_frame_id': LaunchConfig('world_frame'),
-                             'child_frame_id': 'zed_front_camera_center',
-                             'publish_tf': False}}
+                             'child_frame_id': 'pulse80_imu_link',
+                             'base_frame_id': LaunchConfig('base_frame'),
+                             'publish_tf': LaunchConfig('publish_tf')}}
 
     frontend_remappings = []
     for arm in ARMS:
@@ -64,6 +65,21 @@ def launch_setup(context, *args, **kwargs):
     backend_remappings = [
         ('optical_flow', LaunchConfig('flow_topic')),
         ('imu', LaunchConfig('imu_topic'))]
+
+    if LaunchConfig('composed').perform(context).lower() != 'true':
+        # Separate processes: no load_node service handshake, which can time
+        # out under heavy DDS discovery (Isaac Sim + 4 ZED) and then leaves
+        # the backend unloaded.
+        return [
+            Node(package='basalt_ros', executable='vio_frontend_node',
+                 name='vio_frontend', namespace='basalt',
+                 parameters=[frontend_parameters],
+                 remappings=frontend_remappings, output='screen'),
+            Node(package='basalt_ros', executable='vio_backend_node',
+                 name='vio_backend', namespace='basalt',
+                 parameters=[backend_parameters],
+                 remappings=backend_remappings, output='screen'),
+        ]
 
     container = ComposableNodeContainer(
             name='basalt_vio_container',
@@ -106,8 +122,13 @@ def generate_launch_description():
                   default_value=['optical_flow'],
                   description='optical flow topic'),
         LaunchArg('imu_topic',
-                  default_value=['/zed_front/imu'],
+                  default_value=['/pulse80/imu'],
                   description='combined accel/gyro topic (Isaac Sim, zed_front_camera_center)'),
+        LaunchArg('base_frame', default_value=['base_link'],
+                  description='frame published as child of world_frame '
+                  '(empty: the IMU frame)'),
+        LaunchArg('publish_tf', default_value=['true'],
+                  description='broadcast world_frame -> base_frame on TF'),
         LaunchArg('world_frame',
                   default_value=['basalt_odom'],
                   description='frame of the published VIO odometry'),
@@ -115,5 +136,8 @@ def generate_launch_description():
                   description='max stamp difference [s] of the images of a frame'),
         LaunchArg('use_sim_time', default_value=['true'],
                   description='use the Isaac Sim /clock'),
+        LaunchArg('composed', default_value=['false'],
+                  description='true: one component container (intra-process); '
+                  'false: frontend and backend as separate processes'),
         OpaqueFunction(function=launch_setup)
         ])

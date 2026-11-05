@@ -49,6 +49,14 @@ void ImageSubscriber::imageCallback(size_t cam, const ImageConstPtr & img)
   {
     std::lock_guard<std::mutex> lock(mutex_);
     const int64_t t = to_ns(img->header.stamp);
+    if (t <= lastFrameNs_) {
+      // basalt needs strictly increasing frame stamps (the ZED sim repeats some)
+      RCLCPP_WARN_STREAM_THROTTLE(
+        node_->get_logger(), *node_->get_clock(), 5000,
+        "dropping image " << t << " of cam " << cam
+                          << ", not newer than last frame " << lastFrameNs_);
+      return;
+    }
     auto it = pending_.end();
     for (auto p = pending_.begin(); p != pending_.end(); ++p) {
       if (std::llabs(p->first - t) <= syncToleranceNs_ && !p->second[cam]) {
@@ -72,6 +80,7 @@ void ImageSubscriber::imageCallback(size_t cam, const ImageConstPtr & img)
       }
     }
     frame = it->second;
+    lastFrameNs_ = std::max(lastFrameNs_, to_ns(frame[0]->header.stamp));
     // older frames can no longer complete
     pending_.erase(pending_.begin(), std::next(it));
   }

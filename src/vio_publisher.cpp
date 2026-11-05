@@ -86,7 +86,9 @@ VIOPublisher::VIOPublisher(rclcpp::Node * node) : node_(node)
   RCLCPP_INFO(node_->get_logger(), "starting publisher");
 
   pub_ = node_->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
-  pathPub_ = node_->create_publisher<nav_msgs::msg::Path>("path", 2);
+  pathPub_ = node_->create_publisher<nav_msgs::msg::Path>("/basalt/path", 2);
+
+  
   // we don't do covariance quite yet....
   // Diagonal covariances, overridable via parameters. Defaults are
   // deliberately conservative so a downstream EKF does not trust the
@@ -98,8 +100,18 @@ VIOPublisher::VIOPublisher(rclcpp::Node * node) : node_(node)
   twistCov_ = diag_cov(node_, "twist_covariance_diagonal",
                        {0.02, 0.02, 0.04, 1e3, 1e3, 1e3});
   msg_.header.frame_id = node_->declare_parameter("world_frame_id", "odom");
-  msg_.child_frame_id =
-    node_->declare_parameter("child_frame_id", "camera_imu");
+  imuFrame_ = node_->declare_parameter("child_frame_id", "camera_imu");
+  // If base_frame_id is set (e.g. "base_link"), the IMU pose estimated by
+  // basalt is composed with the static base->imu transform from TF, and
+  // odometry/TF are published as world_frame_id -> base_frame_id.
+  baseFrame_ = node_->declare_parameter("base_frame_id", std::string(""));
+  msg_.child_frame_id = baseFrame_.empty() ? imuFrame_ : baseFrame_;
+  if (!baseFrame_.empty()) {
+    tfBuffer_ = std::make_shared<tf2_ros::Buffer>(node_->get_clock());
+    tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
+    RCLCPP_INFO_STREAM(
+      node_->get_logger(), "publishing odometry for base frame " << baseFrame_);
+  }
   // Per REP-105 the odom->base_link transform belongs to the state
   // estimator (EKF), so broadcasting TF is off by default.
   publishTF_ = node_->declare_parameter("publish_tf", false);
@@ -144,11 +156,60 @@ VIOPublisher::VIOPublisher(rclcpp::Node * node) : node_(node)
   }
 }
 
+void VIOPublisher::setChildFrameId(const std::string & f)
+{
+  if (f != imuFrame_) {
+    imuFrame_ = f;
+    haveImuToBase_ = false;
+  }
+  if (baseFrame_.empty()) {
+    msg_.child_frame_id = f;
+  }
+}
+
+bool VIOPublisher::updateImuToBase()
+{
+  if (haveImuToBase_) {
+    return (true);
+  }
+  try {
+    // transform that maps points in base frame to imu frame: T_imu_base
+    const auto tf =
+      tfBuffer_->lookupTransform(imuFrame_, baseFrame_, tf2::TimePointZero);
+    const auto & tr = tf.transform.translation;
+    const auto & r = tf.transform.rotation;
+    t_i_b_ = Eigen::Vector3d(tr.x, tr.y, tr.z);
+    q_i_b_ = Eigen::Quaterniond(r.w, r.x, r.y, r.z).normalized();
+    haveImuToBase_ = true;
+    RCLCPP_INFO_STREAM(
+      node_->get_logger(), "got " << imuFrame_ << " -> " << baseFrame_
+                                  << ": t=" << t_i_b_.transpose()
+                                  << " q=" << q_i_b_.coeffs().transpose());
+  } catch (const tf2::TransformException & e) {
+    RCLCPP_WARN_STREAM_THROTTLE(
+      node_->get_logger(), *node_->get_clock(), 2000,
+      "waiting for TF " << imuFrame_ << " -> " << baseFrame_ << ": "
+                        << e.what());
+  }
+  return (haveImuToBase_);
+}
+
 void VIOPublisher::publish(const BasaltPoseVelBiasState::Ptr & data)
 {
-  const Eigen::Vector3d T_orig = data->T_w_i.translation();
-  const Eigen::Quaterniond q_orig = data->T_w_i.unit_quaternion();
-  const Eigen::Vector3d vel_world = data->vel_w_i;  // linear vel, world frame
+  if (!baseFrame_.empty() && !updateImuToBase()) {
+    return;  // cannot express the pose in the base frame yet
+  }
+  // pose of the body (imu, or base if configured) in basalt's world frame
+  Eigen::Vector3d T_orig = data->T_w_i.translation();
+  Eigen::Quaterniond q_orig = data->T_w_i.unit_quaternion();
+  Eigen::Vector3d vel_world = data->vel_w_i;  // linear vel, world frame
+  if (!baseFrame_.empty()) {
+    // T_w_b = T_w_i * T_i_b. The base velocity would also need the
+    // omega x r lever-arm term, which is dropped since basalt does not
+    // estimate omega (negligible for small IMU-to-base offsets).
+    T_orig = T_orig + q_orig * t_i_b_;
+    q_orig = q_orig * q_i_b_;
+  }
 
   const Eigen::Vector3d T = extraTF_ ? (q_extra_ * T_orig + T_extra_) : T_orig;
   const Eigen::Quaterniond q = extraTF_ ? (q_extra_ * q_orig) : q_orig;
@@ -163,7 +224,7 @@ void VIOPublisher::publish(const BasaltPoseVelBiasState::Ptr & data)
   msg_.pose.covariance = poseCov_;
 
   // REP-103 / nav_msgs convention: twist is in the child (body) frame.
-  // Rotate basalt's world-frame velocity into the IMU body frame. This
+  // Rotate basalt's world-frame velocity into the body frame. This
   // is invariant under the extra world transform, so use the original q.
   const Eigen::Vector3d vel_body = q_orig.inverse() * vel_world;
   msg_.twist.twist.linear = to_ros_vec(vel_body);
@@ -174,7 +235,7 @@ void VIOPublisher::publish(const BasaltPoseVelBiasState::Ptr & data)
   pub_->publish(msg_);
 
   // Append to the pose history and publish the trajectory (as in MINS).
-  // The poses are downsampled to at most 16384 to prevent rviz crashes:
+
   // https://github.com/ros-visualization/rviz/issues/1107
   geometry_msgs::msg::PoseStamped pose;
   pose.header = msg_.header;
@@ -182,9 +243,10 @@ void VIOPublisher::publish(const BasaltPoseVelBiasState::Ptr & data)
   path_.push_back(pose);
 
   nav_msgs::msg::Path path;
-  path.header = msg_.header;
+  path.header.stamp = rclcpp::Clock().now();
+  path.header.frame_id = msg_.header.frame_id;
   const size_t step =
-    static_cast<size_t>(std::floor(path_.size() / 16384.0)) + 1;
+    static_cast<size_t>(std::floor((double)path_.size() / 16384.0)) + 1;
   for (size_t i = 0; i < path_.size(); i += step) {
     path.poses.push_back(path_[i]);
   }

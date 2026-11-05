@@ -4,8 +4,8 @@
 The ZED wrapper publishes rectified images, so every camera is a pinhole without
 distortion. The intrinsics are read from the rectified camera_info topics (or
 estimated with --estimate), the camera poses in the IMU frame from the rig URDF
-(amiad_description/urdf/amiad.urdf.xacro). The IMU is the one Isaac Sim publishes
-on /zed_front/imu, at zed_front_camera_center (x forward, y left, z up).
+(amiad_description/urdf/amiad.urdf.xacro). The IMU is the Pulse80 Isaac Sim publishes
+on /pulse80/imu, at pulse80_imu_link (mounted upside down: x forward, y right, z down).
 
 Cameras are written in stereo pairs, left then right, in the order of --arms.
 
@@ -141,7 +141,7 @@ def calibration(urdf, infos, arms, imu_frame, imu_rate):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--arms', default='front', help='comma separated, e.g. front,left,rear,right')
-    parser.add_argument('--imu-frame', default='zed_front_camera_center')
+    parser.add_argument('--imu-frame', default='pulse80_imu_link')
     parser.add_argument('--imu-rate', type=float, default=200.0)
     parser.add_argument('--urdf', default='', help='URDF file (default: amiad_description amiad.urdf.xacro)')
     parser.add_argument('--estimate', action='store_true',

@@ -57,6 +57,7 @@ private:
 
   int64_t max_q_{0};
   const int64_t camTimeOffsetNs_;
+  int64_t lastNs_{-1};  // stamp of the last result sent to the queue
 };
 }  // namespace basalt_ros
 #endif  // BASALT_ROS__OPTICAL_FLOW_SUBSCRIBER_HPP_
