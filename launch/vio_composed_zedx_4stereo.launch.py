@@ -56,12 +56,15 @@ def launch_setup(context, *args, **kwargs):
                              'base_frame_id': LaunchConfig('base_frame'),
                              'publish_tf': LaunchConfig('publish_tf')}}
 
+    # ros: sim images (rgb8, made gray by the frontend); zed: ZED wrapper gray images
+    zed_mode = LaunchConfig('camera_mode').perform(context).lower() == 'zed'
     frontend_remappings = []
     for arm in ARMS:
         for side in ('left', 'right'):
             frontend_remappings.append(
                 (f'image_{len(frontend_remappings)}',
-                 f'/zed_{arm}/zed_node/{side}/gray/rect/image'))
+                 f'/zed_{arm}/zed_node/{side}/gray/rect/image' if zed_mode
+                 else f'/zed_{arm}/{side}/image_rect_color'))
     backend_remappings = [
         ('optical_flow', LaunchConfig('flow_topic')),
         ('imu', LaunchConfig('imu_topic'))]
@@ -136,6 +139,9 @@ def generate_launch_description():
                   description='max stamp difference [s] of the images of a frame'),
         LaunchArg('use_sim_time', default_value=['true'],
                   description='use the Isaac Sim /clock'),
+        LaunchArg('camera_mode', default_value=['ros'],
+                  description='ros: sim /zed_<arm>/<side>/image_rect_color; '
+                  'zed: ZED wrapper /zed_<arm>/zed_node/<side>/gray/rect/image'),
         LaunchArg('composed', default_value=['false'],
                   description='true: one component container (intra-process); '
                   'false: frontend and backend as separate processes'),

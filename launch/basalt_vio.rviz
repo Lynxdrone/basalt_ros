@@ -116,9 +116,17 @@ Visualization Manager:
           Value: true
         inertial_link:
           Value: true
+        jetson_box_link:
+          Value: true
+        knight_link:
+          Value: true
         left_arm_link:
           Value: true
         left_support_link:
+          Value: true
+        livox_base_link:
+          Value: true
+        livox_frame:
           Value: true
         odom:
           Value: true
@@ -235,6 +243,10 @@ Visualization Manager:
                         zed_front_right_camera_optical_frame:
                           zed_front_right_camera_frame_optical:
                             {}
+              jetson_box_link:
+                {}
+              knight_link:
+                {}
               left_arm_link:
                 left_support_link:
                   zed_left_link:
@@ -249,6 +261,9 @@ Visualization Manager:
                         zed_left_right_camera_optical_frame:
                           zed_left_right_camera_frame_optical:
                             {}
+              livox_base_link:
+                livox_frame:
+                  {}
               pulse80_link:
                 pulse80_imu_link:
                   {}
@@ -294,9 +309,6 @@ Visualization Manager:
               {}
             rear_right_wheel_link:
               {}
-        odom:
-          base_link_gt:
-            {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -310,255 +322,20 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /robot_description
-      Enabled: true
+      Enabled: false
       Links:
         All Links Enabled: true
         Expand Joint Details: false
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        amiad_base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        base_footprint:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        front_arm_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        front_left_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        front_right_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        front_support_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        inertial_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        left_arm_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        left_support_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        pulse80_imu_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        pulse80_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rear_arm_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        rear_left_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rear_right_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rear_support_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        right_arm_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        right_support_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        structure_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        zed_front_camera_center:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_front_camera_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_front_left_camera_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_front_left_camera_frame_optical:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_front_left_camera_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_front_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        zed_front_right_camera_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_front_right_camera_frame_optical:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_front_right_camera_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_left_camera_center:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_left_camera_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_left_left_camera_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_left_left_camera_frame_optical:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_left_left_camera_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_left_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        zed_left_right_camera_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_left_right_camera_frame_optical:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_left_right_camera_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_rear_camera_center:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_rear_camera_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_rear_left_camera_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_rear_left_camera_frame_optical:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_rear_left_camera_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_rear_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        zed_rear_right_camera_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_rear_right_camera_frame_optical:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_rear_right_camera_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_right_camera_center:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_right_camera_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_right_left_camera_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_right_left_camera_frame_optical:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_right_left_camera_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_right_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        zed_right_right_camera_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_right_right_camera_frame_optical:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        zed_right_right_camera_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
       Mass Properties:
         Inertia: false
         Mass: false
       Name: RobotModel
       TF Prefix: ""
       Update Interval: 0
-      Value: true
+      Value: false
       Visual Enabled: true
     - Class: rviz_default_plugins/Image
       Enabled: true
@@ -648,7 +425,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 4.2904558181762695
+      Distance: 2.2642104625701904
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1

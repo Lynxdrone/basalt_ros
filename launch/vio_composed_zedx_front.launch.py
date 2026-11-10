@@ -13,10 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Basalt VIO on the front ZED X of the AMIAD rig (Isaac Sim, zed camera mode).
-# The ZED wrapper must publish the gray images:
+# Basalt VIO on the front ZED X of the AMIAD rig (Isaac Sim).
+# Default: ros camera mode, the sim publishes /zed_front/{left,right}/image_rect_color (rgb8,
+# converted to gray by the frontend).
+# zed camera mode: run the ZED wrapper with gray images and pass the topics:
 #   ros2 launch amiad_description zed_sim_cameras.launch.py cameras:=front \
 #     depth_mode:=NONE param_overrides:='video.publish_gray:=true'
+#   ros2 launch basalt_ros vio_composed_zedx_front.launch.py \
+#     left_image:=/zed_front/zed_node/left/gray/rect/image \
+#     right_image:=/zed_front/zed_node/right/gray/rect/image
 #
 
 import launch
@@ -90,11 +95,11 @@ def generate_launch_description():
     """Create simple node by calling opaque function."""
     return launch.LaunchDescription([
         LaunchArg('left_image',
-                  default_value=['/zed_front/zed_node/left/gray/rect/image'],
-                  description='left rectified mono8 image'),
+                  default_value=['/zed_front/left/image_rect_color'],
+                  description='left rectified image (mono8 or rgb8/bgr8/rgba8/bgra8)'),
         LaunchArg('right_image',
-                  default_value=['/zed_front/zed_node/right/gray/rect/image'],
-                  description='right rectified mono8 image'),
+                  default_value=['/zed_front/right/image_rect_color'],
+                  description='right rectified image (mono8 or rgb8/bgr8/rgba8/bgra8)'),
         LaunchArg('calib_file', default_value=['zedx_front_calib.json'],
                   description='camera calibration file'),
         LaunchArg('config_file', default_value=['zedx_vio_config.json'],

@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <functional>
 #include <stdexcept>
+#include <string>
 
 namespace basalt_ros
 {
@@ -103,12 +104,36 @@ void ImageSubscriber::callback(const std::vector<ImageConstPtr> & msg)
       new basalt::ManagedImage<uint16_t>(img.width, img.height));
 
     uint16_t * data_out = data->img_data[i].img->ptr;
-    // TODO(Bernd): this 8-bit to 16bit conversion can probably be done
-    // more efficiently with opencv
+    // color images (e.g. Isaac Sim rgb8) are converted to gray:
+    // Y = (77 R + 150 G + 29 B) / 256, stored in the high byte
+    const std::string & enc = img.encoding;
+    size_t ch = 1, r = 0, b = 0;
+    if (enc == "rgb8") {
+      ch = 3, r = 0, b = 2;
+    } else if (enc == "bgr8") {
+      ch = 3, r = 2, b = 0;
+    } else if (enc == "rgba8") {
+      ch = 4, r = 0, b = 2;
+    } else if (enc == "bgra8") {
+      ch = 4, r = 2, b = 0;
+    } else if (enc != "mono8" && enc != "8UC1") {
+      RCLCPP_ERROR_STREAM_THROTTLE(
+        node_->get_logger(), *node_->get_clock(), 5000,
+        "unsupported image encoding " << enc << ", need mono8/rgb8/bgr8/rgba8/bgra8");
+      return;
+    }
     for (size_t y = 0; y < img.height; y++) {
       const uint8_t * data_in = &img.data[y * img.step];
-      for (size_t x = 0; x < img.width; x++) {
-        data_out[y * img.width + x] = data_in[x] << 8;
+      uint16_t * out = data_out + y * img.width;
+      if (ch == 1) {
+        for (size_t x = 0; x < img.width; x++) {
+          out[x] = data_in[x] << 8;
+        }
+      } else {
+        for (size_t x = 0; x < img.width; x++) {
+          const uint8_t * p = data_in + x * ch;
+          out[x] = static_cast<uint16_t>(77 * p[r] + 150 * p[1] + 29 * p[b]);
+        }
       }
     }
   }
