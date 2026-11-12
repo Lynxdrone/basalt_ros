@@ -14,14 +14,13 @@
 # limitations under the License.
 #
 # Basalt VIO on the front ZED X of the AMIAD rig (Isaac Sim).
-# Default: ros camera mode, the sim publishes /zed_front/{left,right}/image_rect_color (rgb8,
-# converted to gray by the frontend).
-# zed camera mode: run the ZED wrapper with gray images and pass the topics:
-#   ros2 launch amiad_description zed_sim_cameras.launch.py cameras:=front \
-#     depth_mode:=NONE param_overrides:='video.publish_gray:=true'
-#   ros2 launch basalt_ros vio_composed_zedx_front.launch.py \
-#     left_image:=/zed_front/zed_node/left/gray/rect/image \
-#     right_image:=/zed_front/zed_node/right/gray/rect/image
+# Default: zed camera mode (launch_sim_teleop.sh default), ZED wrapper gray images /zed_front/zed_node/{left,right}/gray/rect/image,
+# calibration zedx_front_calib_zed.json (ZED SDK rectified intrinsics):
+#   CAMERA_MODE=zed CAMERAS=front src/amiad_description/scripts/launch_sim_teleop.sh
+#   ros2 launch basalt_ros vio_composed_zedx_front.launch.py
+# ros camera mode (CAMERA_MODE=ros): the sim publishes /zed_front/{left,right}/image_rect_color
+# (rgb8, converted to gray by the frontend), calibration zedx_front_calib.json:
+#   ros2 launch basalt_ros vio_composed_zedx_front.launch.py camera_mode:=ros
 #
 
 import launch
@@ -42,8 +41,13 @@ def pkg_file(fname):
 def launch_setup(context, *args, **kwargs):
     """Create container."""
     use_sim_time = LaunchConfig('use_sim_time').perform(context).lower() == 'true'
+    # ros: sim images (rgb8, made gray by the frontend); zed: ZED wrapper gray images
+    zed_mode = LaunchConfig('camera_mode').perform(context).lower() == 'zed'
+    # the ZED SDK rectification has its own intrinsics (fx 370.8 vs 336.1 for the sim pinhole)
+    calib_file = (LaunchConfig('calib_file').perform(context)
+                  or f'zedx_front_calib{"_zed" if zed_mode else ""}.json')
     common_parameters = \
-        {'calibration_file': pkg_file(LaunchConfig('calib_file')),
+        {'calibration_file': pkg_file(calib_file),
          'vio_config_file': pkg_file(LaunchConfig('config_file')),
          'use_sim_time': use_sim_time}
     frontend_parameters = common_parameters
@@ -55,8 +59,10 @@ def launch_setup(context, *args, **kwargs):
                              'publish_tf': LaunchConfig('publish_tf')}}
 
     frontend_remappings = [
-        ('left_image', LaunchConfig('left_image')),
-        ('right_image', LaunchConfig('right_image'))]
+        (f'{side}_image', LaunchConfig(f'{side}_image').perform(context)
+         or (f'/zed_front/zed_node/{side}/gray/rect/image' if zed_mode
+             else f'/zed_front/{side}/image_rect_color'))
+        for side in ('left', 'right')]
     backend_remappings = [
         ('optical_flow', LaunchConfig('flow_topic')),
         ('imu', LaunchConfig('imu_topic'))]
@@ -94,14 +100,18 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     """Create simple node by calling opaque function."""
     return launch.LaunchDescription([
-        LaunchArg('left_image',
-                  default_value=['/zed_front/left/image_rect_color'],
-                  description='left rectified image (mono8 or rgb8/bgr8/rgba8/bgra8)'),
-        LaunchArg('right_image',
-                  default_value=['/zed_front/right/image_rect_color'],
-                  description='right rectified image (mono8 or rgb8/bgr8/rgba8/bgra8)'),
-        LaunchArg('calib_file', default_value=['zedx_front_calib.json'],
-                  description='camera calibration file'),
+        LaunchArg('camera_mode', default_value=['zed'],
+                  description='ros: sim /zed_front/<side>/image_rect_color; '
+                  'zed: ZED wrapper /zed_front/zed_node/<side>/gray/rect/image'),
+        LaunchArg('left_image', default_value=[''],
+                  description='left rectified image (mono8 or rgb8/bgr8/rgba8/bgra8), '
+                  'default from camera_mode'),
+        LaunchArg('right_image', default_value=[''],
+                  description='right rectified image (mono8 or rgb8/bgr8/rgba8/bgra8), '
+                  'default from camera_mode'),
+        LaunchArg('calib_file', default_value=[''],
+                  description='camera calibration file (default zedx_front_calib.json, '
+                  'zedx_front_calib_zed.json with camera_mode:=zed)'),
         LaunchArg('config_file', default_value=['zedx_vio_config.json'],
                   description='vio config file'),
         LaunchArg('flow_topic',

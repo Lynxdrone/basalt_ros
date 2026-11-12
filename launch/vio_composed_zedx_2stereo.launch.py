@@ -42,13 +42,21 @@ def pkg_file(fname):
 def launch_setup(context, *args, **kwargs):
     """Create container."""
     use_sim_time = LaunchConfig('use_sim_time').perform(context).lower() == 'true'
+    # ros: sim images (rgb8, made gray by the frontend); zed: ZED wrapper gray images
+    zed_mode = LaunchConfig('camera_mode').perform(context).lower() == 'zed'
+    # the ZED SDK rectification has its own intrinsics (fx 370.8 vs 336.1 for the sim pinhole)
+    calib_file = (LaunchConfig('calib_file').perform(context)
+                  or f'zedx_2stereo_calib{"_zed" if zed_mode else ""}.json')
+    # the ZED streams are stamped independently: looser sync between the ZEDs
+    sync_tolerance = float(LaunchConfig('sync_tolerance').perform(context)
+                           or (0.02 if zed_mode else 0.005))
     common_parameters = \
-        {'calibration_file': pkg_file(LaunchConfig('calib_file')),
+        {'calibration_file': pkg_file(calib_file),
          'vio_config_file': pkg_file(LaunchConfig('config_file')),
          'use_sim_time': use_sim_time}
     frontend_parameters = {
         **common_parameters,
-        **{'sync_tolerance': float(LaunchConfig('sync_tolerance').perform(context))}}
+        **{'sync_tolerance': sync_tolerance}}
     backend_parameters = {**common_parameters,
                           **{'has_split_accel_and_gyro_topics': False,
                              'world_frame_id': LaunchConfig('world_frame'),
@@ -56,8 +64,6 @@ def launch_setup(context, *args, **kwargs):
                              'base_frame_id': LaunchConfig('base_frame'),
                              'publish_tf': LaunchConfig('publish_tf')}}
 
-    # ros: sim images (rgb8, made gray by the frontend); zed: ZED wrapper gray images
-    zed_mode = LaunchConfig('camera_mode').perform(context).lower() == 'zed'
     frontend_remappings = []
     for arm in ARMS:
         for side in ('left', 'right'):
@@ -117,8 +123,9 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     """Create simple node by calling opaque function."""
     return launch.LaunchDescription([
-        LaunchArg('calib_file', default_value=['zedx_2stereo_calib.json'],
-                  description='camera calibration file'),
+        LaunchArg('calib_file', default_value=[''],
+                  description='camera calibration file (default zedx_2stereo_calib.json, '
+                  'zedx_2stereo_calib_zed.json with camera_mode:=zed)'),
         LaunchArg('config_file', default_value=['zedx_vio_config.json'],
                   description='vio config file'),
         LaunchArg('flow_topic',
@@ -135,11 +142,12 @@ def generate_launch_description():
         LaunchArg('world_frame',
                   default_value=['basalt_odom'],
                   description='frame of the published VIO odometry'),
-        LaunchArg('sync_tolerance', default_value=['0.005'],
-                  description='max stamp difference [s] of the images of a frame'),
+        LaunchArg('sync_tolerance', default_value=[''],
+                  description='max stamp difference [s] of the images of a frame '
+                  '(default 0.005, 0.02 with camera_mode:=zed)'),
         LaunchArg('use_sim_time', default_value=['true'],
                   description='use the Isaac Sim /clock'),
-        LaunchArg('camera_mode', default_value=['ros'],
+        LaunchArg('camera_mode', default_value=['zed'],
                   description='ros: sim /zed_<arm>/<side>/image_rect_color; '
                   'zed: ZED wrapper /zed_<arm>/zed_node/<side>/gray/rect/image'),
         LaunchArg('composed', default_value=['false'],
