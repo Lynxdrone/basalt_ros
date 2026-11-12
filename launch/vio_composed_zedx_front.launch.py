@@ -126,7 +126,7 @@ def generate_launch_description():
         LaunchArg('publish_tf', default_value=['true'],
                   description='broadcast world_frame -> base_frame on TF'),
         LaunchArg('world_frame',
-                  default_value=['basalt_odom'],
+                  default_value=['odom'],
                   description='frame of the published VIO odometry'),
         LaunchArg('use_sim_time', default_value=['true'],
                   description='use the Isaac Sim /clock'),

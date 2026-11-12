@@ -142,7 +142,7 @@ def generate_launch_description():
         LaunchArg('publish_tf', default_value=['true'],
                   description='broadcast world_frame -> base_frame on TF'),
         LaunchArg('world_frame',
-                  default_value=['basalt_odom'],
+                  default_value=['odom'],
                   description='frame of the published VIO odometry'),
         LaunchArg('sync_tolerance', default_value=[''],
                   description='max stamp difference [s] of the images of a frame '
