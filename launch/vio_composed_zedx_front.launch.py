@@ -18,7 +18,7 @@
 # calibration zedx_front_calib_zed.json (ZED SDK rectified intrinsics):
 #   CAMERA_MODE=zed CAMERAS=front src/amiad_description/scripts/launch_sim_teleop.sh
 #   ros2 launch basalt_ros vio_composed_zedx_front.launch.py
-# ros camera mode (CAMERA_MODE=ros): the sim publishes /zed_front/{left,right}/image_rect_color
+# ros camera mode (CAMERA_MODE=ros): the sim publishes /zed_front/zed_node/{left,right}/image_rect_color
 # (rgb8, converted to gray by the frontend), calibration zedx_front_calib.json:
 #   ros2 launch basalt_ros vio_composed_zedx_front.launch.py camera_mode:=ros
 #
@@ -61,7 +61,7 @@ def launch_setup(context, *args, **kwargs):
     frontend_remappings = [
         (f'{side}_image', LaunchConfig(f'{side}_image').perform(context)
          or (f'/zed_front/zed_node/{side}/gray/rect/image' if zed_mode
-             else f'/zed_front/{side}/image_rect_color'))
+             else f'/zed_front/zed_node/{side}/image_rect_color'))
         for side in ('left', 'right')]
     backend_remappings = [
         ('optical_flow', LaunchConfig('flow_topic')),
@@ -101,7 +101,7 @@ def generate_launch_description():
     """Create simple node by calling opaque function."""
     return launch.LaunchDescription([
         LaunchArg('camera_mode', default_value=['zed'],
-                  description='ros: sim /zed_front/<side>/image_rect_color; '
+                  description='ros: sim /zed_front/zed_node/<side>/image_rect_color; '
                   'zed: ZED wrapper /zed_front/zed_node/<side>/gray/rect/image'),
         LaunchArg('left_image', default_value=[''],
                   description='left rectified image (mono8 or rgb8/bgr8/rgba8/bgra8), '

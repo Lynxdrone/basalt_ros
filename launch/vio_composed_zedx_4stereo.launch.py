@@ -70,7 +70,7 @@ def launch_setup(context, *args, **kwargs):
             frontend_remappings.append(
                 (f'image_{len(frontend_remappings)}',
                  f'/zed_{arm}/zed_node/{side}/gray/rect/image' if zed_mode
-                 else f'/zed_{arm}/{side}/image_rect_color'))
+                 else f'/zed_{arm}/zed_node/{side}/image_rect_color'))
     backend_remappings = [
         ('optical_flow', LaunchConfig('flow_topic')),
         ('imu', LaunchConfig('imu_topic'))]
@@ -148,7 +148,7 @@ def generate_launch_description():
         LaunchArg('use_sim_time', default_value=['true'],
                   description='use the Isaac Sim /clock'),
         LaunchArg('camera_mode', default_value=['zed'],
-                  description='ros: sim /zed_<arm>/<side>/image_rect_color; '
+                  description='ros: sim /zed_<arm>/zed_node/<side>/image_rect_color; '
                   'zed: ZED wrapper /zed_<arm>/zed_node/<side>/gray/rect/image'),
         LaunchArg('composed', default_value=['false'],
                   description='true: one component container (intra-process); '
